@@ -72,7 +72,7 @@ To model large astrophysical domains effectively, high-resolution runs are migra
 ├── python/
 │   ├── poisson_astro_v1.py                        # v1.0 Gauss-Seidel baseline script
 │   └── poisson_astro_SOR_v1.1.py                  # v1.2 Python SOR
-│   └── poisson_astro_SOR_plus_L2_residual.py      # v1.2 Python SOR script with L2 Residual tracking
+│   └── poisson_astro_SOR_plus_L2_residual_v1.2.py      # v1.2 Python SOR script with L2 Residual tracking
 └── cpp/
     └── poisson_astro_SOR.cpp                      # v1.1 High-performance C++ HPC implementation
 
