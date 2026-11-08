@@ -1,9 +1,3 @@
-Here is your updated, professional `README.md` structured with **v1.2** capturing the mathematical rigor milestone, leaving **v2.0** ready for when you conquer the open-space boundary conditions (Flaw 1).
-
-You can copy and paste this directly into your GitHub repository:
-
----
-
 # 2D Gravitational Poisson Solver & Astrophysical Jeans Collapse
 
 A high-performance computational astrophysics simulation modeling the gravitational potential, field vector dynamics, and dynamical Virial stability of self-gravitating interstellar gas clouds.
