@@ -1,17 +1,50 @@
-# 2D Gravitational Poisson Solver & Astrophysical Jeans Collapse
+# 2D Gravitational Poisson Solver & Astrophysical Virial Collapse Analysis
 
-A high-performance computational astrophysics simulation modeling the gravitational potential, field vector dynamics, and dynamical Virial stability of self-gravitating interstellar gas clouds.
+A computational astrophysics project that models the gravitational potential, the field vectors and the virial stability of a self-gravitating interstellar gas cloud on a 2D grid.
+
+> **Status:** v1.3 (Python) is the current reference version. The C++ port is still based on v1.1 and has not been synchronized yet (see [Known Issues](#-known-issues)).
 
 ---
 
-## 🚀 Development Roadmap & Version History
+## 🚀 Version History
 
-This repository documents an iterative engineering and scientific workflow, scaling from exploratory prototypes to rigorous academic standards:
+This repository documents an iterative engineering and scientific workflow. Each entry lists **what was improved compared with the previous version**.
 
-* **[x] v1.0 (Python Baseline):** Standard Gauss-Seidel iterative relaxation solver with Dirichlet boundary conditions and Virial Jeans stability analysis.
-* **[x] v1.1 (Python Optimization):** Accelerated convergence via Successive Over-Relaxation (SOR) using an optimal relaxation parameter ($\omega$).
-* **[x] v1.2 (Mathematical Rigor):** Upgraded convergence tracking from arbitrary iteration deltas (`max_diff`) to a **True Global L2 Residual Norm**, ensuring true mathematical solution of Poisson's equation.
-* **[x] v1.1 / HPC (C++ Migration):** Rewritten for high-performance computing using a cache-efficient 1D flat-vector architecture (`std::vector<double>` with row-major indexing) and `-O3` compiler optimization.
+### v1.3 — Correctness fixes, input validation and honest labelling *(current)*
+
+**Improved over v1.2:**
+
+* **Correct SOR relaxation parameter:** now $\omega = 2/(1+\sin(\pi/(N-1)))$. Versions 1.1 and 1.2 used $\pi/N$, which slightly overestimated $\omega$.
+* **Input validation:** the grid size ($N \ge 3$), the mass ($M > 0$) and the sound speed ($c_s > 0$) are checked, and the program asks again on invalid values.
+* **All inputs are asked up front,** before the long computation starts.
+* **Accurate physical labels:**
+  * "Jeans" wording replaced by "virial" (the test compares $\vert W\vert$ with $2K_{\text{th}}$; it is not a Jeans-length criterion).
+  * "Thermal dispersal" replaced by "not self-gravity bound (pressure-supported)", because the virial test alone cannot prove dispersal.
+  * "Gravitational collapse" replaced by "gravity dominates (collapse-prone by the virial criterion)", because a static criterion does not simulate collapse.
+* **Code organisation:** the script is split into numbered sections (parameters, inputs, grid, solver, energies and virial analysis, dashboard), and comment typos were fixed.
+
+### v1.2 — Convergence metric
+
+**Improved over v1.1:**
+
+* Replaced the per-sweep maximum change (`max_diff`) with a **global L2 residual norm** of the discretised Poisson equation as the stopping criterion. A small change per sweep does not guarantee a small error, whereas the residual measures how well the equation is actually satisfied.
+
+### v1.1 — Successive Over-Relaxation (Python)
+
+**Improved over v1.0:**
+
+* Replaced plain Gauss-Seidel by **SOR** with a relaxation parameter $\omega$ close to its optimum, which reduces the number of sweeps needed.
+
+### v1.1-cpp — C++ port *(not yet synchronized with v1.2/v1.3)*
+
+**Improved over the Python v1.1:**
+
+* Rewritten in C++ with a flat, row-major `std::vector<double>` and compiled with `-O3`, to remove the interpreted-loop overhead on fine grids.
+* It does not yet include the L2 residual (v1.2) or the fixes of v1.3.
+
+### v1.0 — Python baseline
+
+* Gauss-Seidel relaxation with Dirichlet boundary conditions, a Gaussian gas cloud, and a virial stability analysis with a 2x2 dashboard.
 
 ---
 
@@ -29,40 +62,65 @@ The molecular cloud core is modeled as an axisymmetric Gaussian mass profile on 
 
 $$\rho(r) = \frac{M}{2\pi \sigma^2} \exp\left(-\frac{r^2}{2\sigma^2}\right)$$
 
-### 3. Rigorous Convergence Metric (L2 Residual Norm)
+### 3. Convergence Metric (L2 Residual Norm)
 
-To guarantee true mathematical solution of Poisson's equation rather than arbitrary iteration stagnation, convergence in v1.2 is tracked using the global root-mean-square L2 residual norm over $(N-2)^2$ interior nodes:
+Since v1.2, convergence is tracked using the root-mean-square L2 residual over the $(N-2)^2$ interior nodes:
 
 $$\Vert{}R\Vert{}_2 = \sqrt{\frac{1}{(N-2)^2} \sum_{i,j} \left( \frac{\Phi_{i+1,j} + \Phi_{i-1,j} + \Phi_{i,j+1} + \Phi_{i,j-1} - 4\Phi_{i,j} - 4\pi G h^2 \rho_{i,j}}{h^2} \right)^2}$$
 
+The residual is currently accumulated during the sweep (see [Known Issues](#-known-issues)).
+
 ### 4. Virial Stability Analysis
 
-The solver evaluates the global Virial theorem to determine whether a cloud undergoes runaway gravitational collapse or thermal dispersion:
+The solver evaluates a global virial criterion to judge whether self-gravity dominates thermal support:
 
-* **Gravitational Binding Energy ($\vert{}W\vert{}$):** Computed via matter potential and field vector gradients.
-* **Thermal Kinetic Energy ($2K_{\text{th}}$):** Derived from the user-defined isothermal sound speed ($c_s$).
-* **Critical Jeans Threshold:** Compares internal pressure support against self-gravity.
+* **Gravitational energy ($\vert{}W\vert{}$):** computed from the matter potential, $W = \tfrac{1}{2}\int \rho\,\Phi\,dA$. A second estimate from the field energy is printed for comparison.
+* **Thermal kinetic energy ($2K_{\text{th}}$):** derived from the user-defined isothermal sound speed ($c_s$).
+* **Virial critical sound speed:** $c_{s,\text{crit}} = \sqrt{\vert{}W\vert{}/(3M)}$. If $c_s < c_{s,\text{crit}}$, gravity dominates.
+
+This is a static criterion. It does not simulate the collapse dynamics.
+
+---
+
+## ⚠️ Limitations of the Current Model
+
+* The model is **2D**: the Gaussian is effectively an infinite cylinder, and the potential is logarithmic. The thermal energy $K_{\text{th}} = \tfrac{3}{2}Mc_s^2$ is the 3D expression, so the 2D gravity and the 3D thermodynamics are not yet fully consistent.
+* The potential is forced to **zero on the domain edge** (Dirichlet). In 2D this makes $\vert{}W\vert{}$ depend on the box size $L$, so the absolute value of $\vert{}W\vert{}$ (and the verdict near the threshold) should not be read as a physical result yet.
+* The virial test has **no surface-pressure term** and no rotation, turbulence or magnetic field.
+* All quantities are in **normalised units** ($G = 1$); there is no mapping to physical units yet.
 
 ---
 
 ## ⚡ Performance & Language Evolution: Why C++?
 
-While the initial Python implementations provide clean analytical transparency, interpreted languages introduce heavy loop overhead when scaling to fine resolution grids (for $N=1000$, interpreted loops take hours).
+The Python solver uses interpreted nested loops, which become very slow on fine grids (for $N=1000$ they take hours). To scale to large domains, the SOR solver was ported to **C++**:
 
-To model large astrophysical domains effectively, high-resolution runs are migrated to **C++**:
-
-* **Memory Layout:** Replaced high-overhead structures with a flat contiguous `std::vector<double>`, ensuring cache-locality and zero pointer-chasing.
-* **Hardware Optimization:** Compiled natively via `g++` with `-O3` flags, allowing the CPU to utilize internal registers and vector pipelines.
-* **Benchmark Results:** On a dense **$1000 \times 1000$ grid ($1,000,000$ nodes)**, the C++ SOR engine successfully converges in **$\sim 4,200$ iterations** within seconds (~27 seconds), achieving target residuals under $10^{-5}$.
+* **Memory layout:** a flat contiguous `std::vector<double>` with row-major indexing, for cache locality.
+* **Compiler optimisation:** built with `g++ -O3`.
+* **Benchmark:** the C++ v1.1 port was run on a $1000 \times 1000$ grid and stopped after about 4,200 sweeps in about 27 seconds. **These figures are being re-verified** after the C++ source term is synchronized with the Python version (see [Known Issues](#-known-issues)).
 
 ---
 
-## 📋 Thesis Optimization Roadmap & Status
+## 🐞 Known Issues
 
-* [x] **Flaw 2 (Convergence Metric):** Replaced loose iteration delta (`max_diff`) with the true global L2 residual norm. *(Completed & Verified in v1.2)*
-* [ ] **Flaw 1 (Boundary Conditions):** Implement analytical open-space boundary conditions (Monopole/Multipole approximation) to replace rigid zero-potential Dirichlet walls. *(Target for v2.0)*
-* [ ] **Flaw 3 (Boundary Integration):** Clean up boundary integration truncation errors for energy summation.
-* [ ] **Flaw 4 (Memory Cache Optimization):** Optimize cache stride and memory access patterns for high-resolution grids ($N \ge 500$).
+* **Non-convergence guard (v1.3):** the check meant to stop the program when `max_iter` is reached tests `k == max_iter`, which can never be true (the loop counter ends at `max_iter - 1`). A non-converged run therefore still continues to the virial analysis. Planned fix: use an explicit `converged` flag.
+* **Residual evaluation:** the L2 residual is accumulated point by point during the sweep, mixing updated and not-yet-updated neighbours. It should be computed in a separate pass after the sweep.
+* **C++ port:** the source term lacks the $h^2$ factor used in the Python version, so its results are not comparable with v1.3 until it is synchronized. It also has no L2 residual and produces no plots.
+* **Input validation:** non-numeric input and `nan`/`inf` are not yet handled.
+
+---
+
+## 📋 Roadmap
+
+* [x] **Convergence metric:** replace the per-sweep change with the L2 residual norm *(v1.2)*.
+* [x] **Relaxation parameter, input checks and honest labels** *(v1.3)*.
+* [ ] **Convergence guard and robust input validation.**
+* [ ] **Validation:** compare with the analytic field of a 2D Gaussian and run a grid-convergence study.
+* [ ] **Boundary conditions:** replace the rigid zero-potential wall by an analytical open-space (monopole/multipole) boundary, and check that the result no longer depends on $L$.
+* [ ] **Energy integration:** clean up the boundary truncation in the energy sums.
+* [ ] **Performance:** vectorised (red-black) SOR in Python, and cache-friendly access patterns for $N \ge 500$.
+* [ ] **Model consistency:** decide between a fully 2D or fully 3D treatment, add a surface-pressure term and physical units.
+* [ ] **C++ synchronization** with the final Python version.
 
 ---
 
@@ -70,28 +128,31 @@ To model large astrophysical domains effectively, high-resolution runs are migra
 
 ```text
 ├── python/
-│   ├── poisson_astro_v1.py                        # v1.0 Gauss-Seidel baseline script
-│   └── poisson_astro_SOR_v1.1.py                  # v1.2 Python SOR
-│   └── poisson_astro_SOR_plus_L2_residual_v1.2.py      # v1.2 Python SOR script with L2 Residual tracking
-└── cpp/
-    └── poisson_astro_SOR.cpp                      # v1.1 High-performance C++ HPC implementation
-
+│   ├── (v1.0 Gauss-Seidel baseline script)
+│   ├── (v1.1 Python SOR script)
+│   ├── (v1.2 Python SOR script with L2 residual tracking)
+│   └── Poisson_Astro_v1.3.py          # v1.3 current reference version
+├── cpp/
+│   └── poisson_astro_SOR.cpp          # C++ port of v1.1 (not yet synchronized)
+├── Complete.png                       # example dashboard output
+└── README.md
 ```
+
+Adjust the file names above to match the actual files in the `python/` folder.
 
 ---
 
 ## 🏃‍♂️ How to Run
 
-### Python Version (v1.2 Rigorous L2 Residual Solver)
+### Python version (v1.3)
 
 ```bash
-python python/poisson_v1.2_l2_residual.py
-
+python python/Poisson_Astro_v1.3.py
 ```
 
-### C++ High-Performance Version
+You will be asked, in order, for the number of nodes (e.g. `50`), the cloud mass (e.g. `50.0`) and the isothermal sound speed (e.g. `0.5`).
 
-To compile and run the high-performance C++ solver locally:
+### C++ version (v1.1 port, not yet synchronized)
 
 ```bash
 # Compile with maximum -O3 optimization
@@ -99,7 +160,6 @@ g++ cpp/poisson_astro_SOR.cpp -o solver.exe -O3
 
 # Execute the binary
 ./solver.exe
-
 ```
 
-Enter your desired grid dimension (e.g., `100`, `1000`), total mass (e.g., `50.0`), and isothermal sound speed (e.g., `0.3`) when prompted to simulate cloud collapse dynamics.
+Enter the grid dimension, the total mass and the sound speed when prompted (the C++ version prints no prompts for the first two).
